@@ -1,0 +1,199 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h> // Untuk manipulasi waktu dan tanggal
+
+#define MAX_NAMA_BARANG 50
+#define MAX_TANGGAL 15
+#define MAX_PACKAGES 100
+#define MAX_LOCATION_NAME_LEN 50
+
+// Struktur untuk mapping kode pos ke lokasi
+typedef struct {
+    int kode_pos;
+    char lokasi[MAX_LOCATION_NAME_LEN];
+} KodePosLokasi;
+
+KodePosLokasi jakarta_pusat_lokasi[] = {
+    {10510, "Cempaka Putih Timur, Cempaka Putih"}, {10520, "Cempaka Putih Barat, Cempaka Putih"},
+    {10570, "Rawasari, Cempaka Putih"}, {10110, "Gambir, Gambir"}, {10120, "Kebon Kelapa, Gambir"},
+    {10130, "Petojo Utara, Gambir"}, {10140, "Duri Pulo, Gambir"}, {10150, "Cideng, Gambir"},
+    {10160, "Petojo Selatan, Gambir"}, {10530, "Galur, Johar Baru"}, {10540, "Tanah Tinggi, Johar Baru"},
+    {10550, "Kampung Rawa, Johar Baru"}, {10560, "Johar Baru, Johar Baru"}, {10610, "Gunung Sahari Selatan, Kemayoran"},
+    {10620, "Kemayoran, Kemayoran"}, {10630, "Kebon Kosong, Kemayoran"}, {10640, "Cempaka Baru, Kemayoran"},
+    {10640, "Harapan Mulya, Kemayoran"}, {10640, "Sumur Batu, Kemayoran"}, {10650, "Utan Panjang, Kemayoran"},
+    {10650, "Serdang, Kemayoran"}, {10310, "Menteng, Menteng"}, {10320, "Pegangsaan, Menteng"},
+    {10330, "Cikini, Menteng"}, {10340, "Kebon Sirih, Menteng"}, {10350, "Gondangdia, Menteng"},
+    {10710, "Pasar Baru, Sawah Besar"}, {10720, "Gunung Sahari Utara, Sawah Besar"}, {10730, "Mangga Dua Selatan, Sawah Besar"},
+    {10740, "Karang Anyar, Sawah Besar"}, {10750, "Kartini, Sawah Besar"}, {10410, "Senen, Senen"},
+    {10420, "Kwitang, Senen"}, {10430, "Kenari, Senen"}, {10440, "Paseban, Senen"}, {10450, "Kramat, Senen"},
+    {10460, "Bungur, Senen"}, {10210, "Bendungan Hilir, Tanah Abang"}, {10220, "Karet Tengsin, Tanah Abang"},
+    {10230, "Kebon Melati, Tanah Abang"}, {10240, "Kebon Kacang, Tanah Abang"}, {10250, "Kampung Bali, Tanah Abang"},
+    {10260, "Petamburan, Tanah Abang"}, {10270, "Gelora, Tanah Abang"}
+};
+
+char* findLocationByPostalCode(int kode_pos) {
+    int n = sizeof(jakarta_pusat_lokasi) / sizeof(jakarta_pusat_lokasi[0]);
+    for (int i = 0; i < n; i++) {
+        if (jakarta_pusat_lokasi[i].kode_pos == kode_pos) {
+            return jakarta_pusat_lokasi[i].lokasi;
+        }
+    }
+    return "Tidak Diketahui";
+}
+
+// Struktur data paket terbaru
+typedef struct {
+    char nama_barang[MAX_NAMA_BARANG];
+    char tanggal_kirim[MAX_TANGGAL]; // Tanggal mulai kirim (dd/mm/yyyy)
+    int kode_pos;
+    int waktu; // jam tersisa (estimasi pengiriman)
+} Paket;
+
+// --- FUNGSI BARU: Konversi tanggal string ke struct tm ---
+// Mengambil string tanggal "dd/mm/yyyy" dan mengisi struct tm
+void parseDate(const char* date_str, struct tm* tm_struct) {
+    int day, month, year;
+    sscanf(date_str, "%d/%d/%d", &day, &month, &year);
+    tm_struct->tm_mday = day;
+    tm_struct->tm_mon = month - 1; // tm_mon is 0-indexed (0=Jan, 11=Dec)
+    tm_struct->tm_year = year - 1900; // tm_year is years since 1900
+    tm_struct->tm_hour = 0;
+    tm_struct->tm_min = 0;
+    tm_struct->tm_sec = 0;
+    tm_struct->tm_isdst = -1; // Let system determine DST
+}
+
+// --- FUNGSI BARU: Hitung tanggal sampai ---
+// Mengambil tanggal mulai kirim (string) dan sisa waktu (jam),
+// mengembalikan tanggal sampai (string)
+void calculateDeliveryDate(const char* start_date_str, int remaining_hours, char* delivery_date_str) {
+    struct tm start_tm;
+    parseDate(start_date_str, &start_tm);
+
+    time_t start_time_t = mktime(&start_tm); // Konversi ke time_t (detik sejak epoch)
+
+    // Tambahkan jam pengiriman (1 jam = 3600 detik)
+    time_t delivery_time_t = start_time_t + (long)remaining_hours * 3600;
+
+    struct tm* delivery_tm = localtime(&delivery_time_t); // Konversi kembali ke struct tm
+
+    // Format tanggal kembali ke string "dd/mm/yyyy"
+    strftime(delivery_date_str, MAX_TANGGAL, "%d/%m/%Y", delivery_tm);
+}
+
+
+// Fungsi input
+int inputData(Paket data[]) {
+    int n;
+    printf("Masukkan jumlah paket: ");
+    scanf("%d", &n);
+    getchar(); // hapus newline sisa scanf
+
+    for (int i = 0; i < n; i++) {
+        printf("\nPaket ke-%d:\n", i + 1);
+        printf("Nama Barang         : ");
+        fgets(data[i].nama_barang, MAX_NAMA_BARANG, stdin);
+        data[i].nama_barang[strcspn(data[i].nama_barang, "\n")] = '\0'; // hapus newline
+
+        printf("Tanggal Kirim (dd/mm/yyyy): ");
+        fgets(data[i].tanggal_kirim, MAX_TANGGAL, stdin);
+        data[i].tanggal_kirim[strcspn(data[i].tanggal_kirim, "\n")] = '\0';
+
+        printf("Kode Pos            : ");
+        scanf("%d", &data[i].kode_pos);
+        printf("Sisa Waktu (jam)    : ");
+        scanf("%d", &data[i].waktu);
+        getchar(); // hapus newline
+    }
+    return n;
+}
+
+// Fungsi tampil
+void tampilkanData(Paket data[], int n) {
+    printf("\n===== DATA PENGIRIMAN  =====\n");
+    // Definisikan lebar kolom yang akan digunakan
+    const int COL_NO_WIDTH = 3;
+    const int COL_TANGGAL_WIDTH = 12; // Cukup untuk dd/mm/yyyy
+    const int COL_NAMA_BARANG_WIDTH = 20; // Sesuai MAX_NAMA_BARANG - padding
+    // Estimasi lebar untuk "Kode Pos (Lokasi)"
+    const int COL_KODEPOS_LOKASI_WIDTH = 6 + 1 + 1 + MAX_LOCATION_NAME_LEN + 1 + 1;
+    const int COL_TANGGAL_SAMPAI_WIDTH = 12; // Untuk "dd/mm/yyyy"
+
+    // Cetak header kolom dengan posisi baru dan pemisah "|"
+    printf("%-*s | %-*s | %-*s | %-*s | %s\n",
+           COL_NO_WIDTH, "No",
+           COL_TANGGAL_WIDTH, "Tanggal Kirim",
+           COL_NAMA_BARANG_WIDTH, "Nama Barang",
+           COL_KODEPOS_LOKASI_WIDTH, "Kode Pos (Lokasi)",
+           "Estimasi Sampai"); // Header baru
+
+    // Hitung total lebar untuk garis pemisah
+    // COL_NO_WIDTH + (spasi-pemisah) + COL_TANGGAL_WIDTH + (spasi-pemisah) + COL_NAMA_BARANG_WIDTH + (spasi-pemisah) + COL_KODEPOS_LOKASI_WIDTH + (spasi-pemisah) + COL_TANGGAL_SAMPAI_WIDTH (perkiraan)
+    int total_width = COL_NO_WIDTH + 3 + COL_TANGGAL_WIDTH + 3 + COL_NAMA_BARANG_WIDTH + 3 + COL_KODEPOS_LOKASI_WIDTH + 3 + COL_TANGGAL_SAMPAI_WIDTH + 1;
+    for (int i = 0; i < total_width; i++) printf("-");
+    printf("\n");
+
+    for (int i = 0; i < n; i++) {
+        char* lokasi = findLocationByPostalCode(data[i].kode_pos);
+        char kode_pos_lokasi_str[MAX_LOCATION_NAME_LEN + 10]; // Buffer untuk "Kode Pos (Lokasi)"
+        sprintf(kode_pos_lokasi_str, "%d (%s)", data[i].kode_pos, lokasi);
+
+        char tanggal_sampai[MAX_TANGGAL];
+        calculateDeliveryDate(data[i].tanggal_kirim, data[i].waktu, tanggal_sampai); // Panggil fungsi baru
+
+        // Cetak data dengan posisi baru dan Tanggal Sampai
+        printf("%-*d | %-*s | %-*s | %-*s | %-*s\n",
+               COL_NO_WIDTH, i + 1,
+               COL_TANGGAL_WIDTH, data[i].tanggal_kirim,
+               COL_NAMA_BARANG_WIDTH, data[i].nama_barang,
+               COL_KODEPOS_LOKASI_WIDTH, kode_pos_lokasi_str,
+               COL_TANGGAL_SAMPAI_WIDTH, tanggal_sampai); // Output Tanggal Sampai
+    }
+}
+
+// Tukar
+void swap(Paket *a, Paket *b) {
+    Paket tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+// Partition Quick Sort
+int partition(Paket data[], int low, int high) {
+    Paket pivot = data[high];
+    int i = low - 1;
+
+    for (int j = low; j < high; j++) {
+        if (data[j].waktu < pivot.waktu ||
+           (data[j].waktu == pivot.waktu && data[j].kode_pos <= pivot.kode_pos)) {
+            i++;
+            swap(&data[i], &data[j]);
+        }
+    }
+    swap(&data[i + 1], &data[high]);
+    return i + 1;
+}
+
+// Quick Sort
+void quickSort(Paket data[], int low, int high) {
+    if (low < high) {
+        int pi = partition(data, low, high);
+        quickSort(data, low, pi - 1);
+        quickSort(data, pi + 1, high);
+    }
+}
+
+// Main program
+int main() {
+    Paket data[MAX_PACKAGES];
+    int n;
+
+    printf("=== FAST ZONE SORT with Quick Sort ===\n");
+    n = inputData(data);
+
+    quickSort(data, 0, n - 1);
+
+    tampilkanData(data, n);
+    return 0;
+}
